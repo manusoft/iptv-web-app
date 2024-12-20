@@ -1,0 +1,314 @@
+﻿@page "/"
+@using System.Text.Json.Serialization
+@attribute [StreamRendering]
+@inject IJSRuntime JSRuntime
+@inject HttpClient HttpClient
+@inject UrlValidationService UrlValidationService
+
+<PageTitle>Home</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Video Player Section -->
+        <div class="col-md-8 d-flex flex-column">
+            <video id="video" class="w-100 rounded-3 mb-3" controls></video>
+            <span>
+                <img src="@ChannelLogo" class="me-2 rounded" style="height: 40px; width: 40px;" />
+                <h5 class="fw-bold ms-3">@ChannelName</h5>
+            </span>
+        </div>
+
+        <!-- Scrollable List Section -->
+        <div class="col-md-4">
+            <div class="list-container">
+                <ul class="list-group">
+                    @if (watches.Count() == 0)
+                    {
+                        <div class="d-flex justify-content-center align-items-center h-100">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var item in watches)
+                        {
+                            <a class="list-group-item list-group-item-action d-flex align-items-center"
+                               @onclick="()=>WatchChannelAsync(item)">
+                                <img src="@item.Logo" class="me-2 rounded" style="height: 40px; width: 40px;" />
+                                <span>@item.Name</span>
+                            </a>
+                        }
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .list-container {
+        max-height: calc(100vh - 100px); /* Adjust based on header/footer height */
+        overflow-y: auto;
+    }
+
+    .list-group-item img {
+        object-fit: cover;
+    }
+
+    video {
+        max-height: calc(100vh - 150px); /* Adjust based on header/footer height */
+    }
+</style>
+
+
+
+@code {
+    private IList<Channel>? channels;
+    private IList<Streams>? streams;
+    private IList<Watch> watches = new List<Watch>();
+    private string ChannelName { get; set; } = "Asianet News";
+    private string ChannelLogo { get; set; } = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await WatchChannelAsync(new Watch()
+                {
+                    Name = "Asianet News",
+                    Url = "https://vidcdn.vidgyor.com/asianet-origin/liveabr/playlist.m3u8"
+                }
+                );
+
+            await LoadDataAsync();
+            await ValidateAndAddStreamsIncrementally();
+            // await FilterAndAddValidStreamsAsync();
+            StateHasChanged();
+
+            // try
+            // {
+            //     await WatchChannelAsync(new Watch()
+            //         {
+            //             Name = "Asianet News",
+            //             Url = "https://vidcdn.vidgyor.com/asianet-origin/liveabr/playlist.m3u8"
+            //         }
+            //     );
+
+            //     // Fetch Channels and Streams
+            //     channels = await HttpClient.GetFromJsonAsync<List<Channel>>("https://iptv-org.github.io/api/channels.json");
+            //     streams = await HttpClient.GetFromJsonAsync<List<Streams>>("https://iptv-org.github.io/api/streams.json");
+
+            //     // Combine Channels and Streams
+            //     // watches = (from channel in channels
+            //     //            join stream in streams on channel.Id equals stream.Channel
+            //     //            where !string.IsNullOrEmpty(stream.Url) // Exclude null or empty URLs
+            //     //            select new Watch
+            //     //                {
+            //     //                    Id = channel.Id,
+            //     //                    Name = channel.Name,
+            //     //                    Logo = channel.Logo,
+            //     //                    Url = stream.Url
+            //     //                }).ToList();
+
+            //     watches = (from channel in channels
+            //                join stream in streams
+            //                    .Where(s => !string.IsNullOrEmpty(s.Url)) // Exclude null or empty URLs
+            //                    .GroupBy(s => s.Channel)
+            //                    .Select(g => g.Last()) // Take the last stream in each group
+            //                on channel.Id equals stream.Channel
+            //                select new Watch
+            //                    {
+            //                        Id = channel.Id,
+            //                        Name = channel.Name,
+            //                        Logo = channel.Logo,
+            //                        Url = stream.Url
+            //                    }).ToList();
+
+            //     StateHasChanged();
+            // }
+            // catch (Exception ex)
+            // {
+            //     Console.WriteLine($"Error: {ex.Message}");
+            // }
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            // Load channels and streams data
+            channels = await HttpClient.GetFromJsonAsync<List<Channel>>($"https://iptv-org.github.io/api/channels.json");
+            streams = await HttpClient.GetFromJsonAsync<List<Streams>>($"https://iptv-org.github.io/api/streams.json");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private async Task ValidateAndAddStreamsIncrementally()
+    {
+        if (channels == null || streams == null) return;
+
+        // Process streams by group (to ensure last for duplicates) dynamically
+        var groupedStreams = streams.GroupBy(s => s.Channel).Select(g => g.Last());
+
+        foreach (var stream in groupedStreams)
+        {
+            if (!string.IsNullOrEmpty(stream.Url) && await UrlValidationService.IsUrlValidAsync(stream.Url))
+            {
+                var channel = channels.FirstOrDefault(c => c.Id == stream.Channel);
+                if (channel != null)
+                {
+                    // Check for null properties before assigning
+                    if (channel.Id != null && channel.Name != null && channel.Logo != null)
+                    {
+                        watches.Add(new Watch
+                            {
+                                Id = channel.Id,
+                                Name = channel.Name,
+                                Logo = channel.Logo,
+                                Url = stream.Url
+                            });
+
+                        // Trigger UI update
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+            }
+        }
+    }
+
+
+    private async Task FilterAndAddValidStreamsAsync()
+    {
+        if (channels == null || streams == null) return;
+
+        // Combine Channels and Validated Streams
+        var validStreams = new List<Streams>();
+
+        foreach (var stream in streams.GroupBy(s => s.Channel).Select(g => g.Last())) // Take the last stream for each channel
+        {
+            if (!string.IsNullOrEmpty(stream.Url) && await UrlValidationService.IsUrlValidAsync(stream.Url))
+            {
+                validStreams.Add(stream);
+            }
+        }
+
+        // Create the watchlist
+        watches = (from channel in channels
+                   join stream in validStreams on channel.Id equals stream.Channel
+                   select new Watch
+                       {
+                           Id = channel.Id,
+                           Name = channel.Name,
+                           Logo = channel.Logo,
+                           Url = stream.Url
+                       }).ToList();
+    }
+
+    [JSInvokable]
+    public async Task WatchChannelAsync(Watch watch)
+    {
+        try
+        {
+            ChannelName = watch.Name;
+            ChannelLogo = watch.Logo;
+            await JSRuntime.InvokeVoidAsync("playChannel", watch.Url);
+        }
+        catch (JSException ex)
+        {
+            Console.WriteLine($"JSException: {ex.Message}");
+        }
+    }
+
+    public class Channel
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("alt_names")]
+        public List<object> AltNames { get; set; }
+
+        [JsonPropertyName("network")]
+        public object Network { get; set; }
+
+        [JsonPropertyName("owners")]
+        public List<object> Owners { get; set; }
+
+        [JsonPropertyName("country")]
+        public string Country { get; set; }
+
+        [JsonPropertyName("subdivision")]
+        public object Subdivision { get; set; }
+
+        [JsonPropertyName("city")]
+        public string City { get; set; }
+
+        [JsonPropertyName("broadcast_area")]
+        public List<string> BroadcastArea { get; set; }
+
+        [JsonPropertyName("languages")]
+        public List<string> Languages { get; set; }
+
+        [JsonPropertyName("categories")]
+        public List<string> Categories { get; set; }
+
+        [JsonPropertyName("is_nsfw")]
+        public bool IsNsfw { get; set; }
+
+        [JsonPropertyName("launched")]
+        public object Launched { get; set; }
+
+        [JsonPropertyName("closed")]
+        public object Closed { get; set; }
+
+        [JsonPropertyName("replaced_by")]
+        public object ReplacedBy { get; set; }
+
+        [JsonPropertyName("website")]
+        public string Website { get; set; }
+
+        [JsonPropertyName("logo")]
+        public string Logo { get; set; }
+    }
+
+    public class Streams
+    {
+        [JsonPropertyName("channel")]
+        public string Channel { get; set; }
+
+        [JsonPropertyName("url")]
+        public string Url { get; set; }
+
+        [JsonPropertyName("timeshift")]
+        public object Timeshift { get; set; }
+
+        [JsonPropertyName("http_referrer")]
+        public object HttpReferrer { get; set; }
+
+        [JsonPropertyName("user_agent")]
+        public object UserAgent { get; set; }
+    }
+
+    public class Watch
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("logo")]
+        public string Logo { get; set; }
+
+        [JsonPropertyName("url")]
+        public string Url { get; set; }
+    }
+}

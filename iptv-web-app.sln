@@ -5,6 +5,8 @@ VisualStudioVersion = 17.12.35527.113 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LiveTV", "src\LiveTV\LiveTV.csproj", "{CFA906A2-F78C-43EB-AF0F-F04E623EF6F2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Livetv.App", "src\Livetv.App\Livetv.App.csproj", "{AF94FB53-C29B-4BD5-8ECF-B04B9211B0A5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{CFA906A2-F78C-43EB-AF0F-F04E623EF6F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CFA906A2-F78C-43EB-AF0F-F04E623EF6F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CFA906A2-F78C-43EB-AF0F-F04E623EF6F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF94FB53-C29B-4BD5-8ECF-B04B9211B0A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF94FB53-C29B-4BD5-8ECF-B04B9211B0A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF94FB53-C29B-4BD5-8ECF-B04B9211B0A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF94FB53-C29B-4BD5-8ECF-B04B9211B0A5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
